@@ -1,0 +1,96 @@
+IMPORTANT SUGGESTION:
+Feed data which is incoming from first module already is transformed into UTF
+format with Normalization Form Canonical Decomposition.
+
+
+1) Core information about current processing task
+
+1.1. To certainly define information about current processing task is
+suggested to use data structure FeedData:
+    - taskUID:   String   - unique identifier of the current processing task,
+    - urlStr:    String   - representation of the processed url,
+    - feed:      String   - feed data in UTF format with Normalization Form
+      Canonical Decomposition,
+    - timestamp: LocalDateTime - timestamp when this task was started,
+    - options:   Map(String, Object) - optional additional information for
+      current feed.
+
+1.2 Result for each performed formation action has to be stored in FormatResult
+class instance, which will stores
+    - formation result (Ok, Hint, Warn, Error),
+    - newly formatted feed data string,
+    - error message if such was occurs.
+
+
+2) Interfaces of the first module
+
+The first module's feed data provider must implement interface
+
+public interface IFeedDataProvider extends Iterator<FeedData> { }
+
+*Note*: in real world it would be more preferable that first module's feed data
+        provider puts its result to message queuing system (RabbitMQ, for
+        example), but in our testing case let it be in such manner.
+
+
+3) The second module
+
+3.1. The second and third modules will be interacting using enum object
+ConceptType (for prevent others from making mistakes when using our code).
+Also it will give a possibility to increase a number of the allowable concepts.
+For begin, ConceptTypes will consists of three concepts: Entity, Link and
+Twitter username.
+
+3.2. Input for the third module, which will provides the second module, must be
+instance of the FeedConcept class:
+    - conceptType: ConceptType,
+    - startPos:    Long - position in which concept starts,
+    - endPos:      Long - position in which concept ends,
+    - options:     Map(String, Object) - optional additional information for
+      current concept.
+
+3.3 For further potential changes executor of the second module has a
+private constructor and may be builded through a special builder
+ConceptProviderBuidler. This builder has to acquire FeedData instance and may
+to acquire a user defined context ConceptProviderContext.
+
+3.4 The second module's concept data provider must implement interface
+
+public interface IConceptDataProvider extends Iterator<FeedConcept> {
+    IConceptDataProvider checkAfterFormat(
+        FeedConcept concept, FormatResult result);
+}
+
+This allow us to implement a chained formating when necessary.
+
+
+4) The third module formatter
+
+4.1 With each of the concept type must be associated a list of the instances
+
+IConceptFormatRule interface with method
+
+public interface IConceptFormatRule {
+    FormatResult format(FeedConcept concept, String feedStr);
+}
+
+Constructing Map(FeedConcept, List<ConceptRule>) is a responsibility for the
+calling side. This map must be defined when the third module formatter is
+creating.
+There three implementations are provided (as mentioned in task description).
+
+4.2 The third module formatter has to implement interface
+
+public interface IFeedFormatter {
+    FormatResult format(FeedData feedData, IConceptDataProvider conceptProvider);
+}
+
+After each formatting action was performed, formatter may to call
+IConceptDataProvider.checkAfterFormat
+
+4.3 For further potential changes formatter of the third module has a
+private constructor and may be builded through a special builder
+FeedFormatterBuidler. This builder
+    - has to acquire FeedData instance,
+    - has to acquire Map(FeedConcept, List<ConceptRule>),
+    - and may to acquire a user defined context FeedFormatterContext.
