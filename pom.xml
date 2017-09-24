@@ -11,6 +11,7 @@
     <modules>
         <module>jetlore-test-base</module>
         <module>jetlore-test-test</module>
+        <module>jetlore-test-core</module>
     </modules>
 
     <packaging>pom</packaging>
